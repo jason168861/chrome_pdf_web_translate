@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini 即時翻譯+解釋 (含 KaTeX)",
+  "version": "2.0.0",
+  "description": "框選文字即可使用 Gemini API 進行翻譯與數學解釋。請在選項頁面設定您自己的 API 金鑰。",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+    "action": {
+    "default_title": "設定 Gemini API 金鑰",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file://*/*.pdf"],
+      "js": [
+        "marked.min.js",
+        "katex.min.js",
+        "auto-render.min.js",
+        "content.js"
+      ],
+      "css": ["katex.min.css", "style.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "fonts/*" ],
+      "matches": [ "<all_urls>" ]
+    }
+  ],
+  "options_page": "options.html"
+}

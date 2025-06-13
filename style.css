@@ -1,0 +1,423 @@
+/* style.css (v3.7 - 支援 Markdown 樣式) */
+
+/* 新增：PDF 啟用橫幅樣式 */
+#gemini-pdf-activation-banner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #fef7e0; /* 溫和的黃色背景 */
+    color: #5f4c00;
+    padding: 12px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 2147483647; /* 確保在最頂層 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: sans-serif;
+    font-size: 14px;
+}
+
+#gemini-activate-pdf-btn {
+    margin-left: 16px;
+    padding: 6px 12px;
+    border: 1px solid #f9ab00;
+    border-radius: 4px;
+    background-color: #f9ab00;
+    color: #202124;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+/* 按鈕容器的樣式 */
+.gemini-selection-trigger-container {
+    position: absolute;
+    z-index: 2147483647;
+    display: flex; /* 讓內部按鈕橫向排列 */
+    background-color: #ffffff;
+    border: 1px solid #dadce0;
+    border-radius: 8px; /* 整個容器的圓角 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden; /* 關鍵：確保內部元素的邊角被裁剪，以符合容器的圓角 */
+    font-family: sans-serif;
+}
+
+/* 「翻譯」和「解釋」按鈕的共用樣式 */
+.gemini-selection-trigger {
+    padding: 4px 10px;
+    font-size: 13px;
+    color: #3c4043;
+    cursor: pointer;
+    background-color: transparent; /* 按鈕本身背景透明 */
+    transition: background-color 0.2s;
+    white-space: nowrap; /* 防止按鈕文字換行 */
+}
+
+/* 保留懸停效果，讓使用者知道可以點擊 */
+.gemini-selection-trigger:hover {
+    background-color: #f8f9fa;
+}
+
+/* 為按鈕之間添加一條垂直分隔線 */
+.gemini-selection-trigger:not(:first-child) {
+    border-left: 1px solid #dadce0;
+}
+
+
+/* 翻譯結果大框 */
+.gemini-translation-result-box {
+    position: relative; /* 如果已是 absolute，則無需更改 */
+    overflow: hidden;   /* 隱藏超出的部分，保持整潔 */
+    width : 400px; /* 建議設定寬度 */
+    height : 300px;
+    min-height: 100px;  /* 建議設定最小高度 */
+    z-index: 2147483647;
+    display: flex;      /* 啟用 Flexbox 佈局 */
+    flex-direction: column; /* 讓子元素垂直排列 */
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    min-width: 100px;
+    max-width: 800px;
+    font-family: sans-serif;
+    color: #202124;
+}
+
+/* 縮放拉桿的樣式 */
+.gemini-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize; /* 顯示斜向縮放的滑鼠指標 */
+    background-image: linear-gradient(
+      -45deg, 
+      #ccc 2px, transparent 2px,
+      transparent 4px, #ccc 4px, #ccc 6px, transparent 6px,
+      transparent 8px, #ccc 8px, #ccc 10px, transparent 10px
+    );
+    background-color: #f1f3f4;
+    border-top: 1px solid #e0e0e0;
+    border-left: 1px solid #e0e0e0;
+    border-bottom-right-radius: 8px; /* 貼合父容器的圓角 */
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.gemini-resize-handle:hover {
+    opacity: 1;
+}
+
+.gemini-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f1f3f4;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 14px;
+    font-weight: bold;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    cursor: move; /* 讓使用者知道標題可以拖動 */
+}
+
+.gemini-close-btn {
+    font-size: 20px;
+    cursor: pointer;
+    color: #5f6368;
+    padding: 0 4px;
+}
+.gemini-close-btn:hover {
+    color: #000;
+}
+
+/* 標題 (h1, h2, h3) 樣式 */
+.gemini-result-content h1,
+.gemini-result-content h2,
+.gemini-result-content h3,
+.gemini-result-content h4 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.gemini-result-content h1 {
+    font-size: 1.4em; /* 原本可能是 2em，現在大幅縮小 */
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #dfe2e5; /* 加上底線，更像標題 */
+}
+
+.gemini-result-content h2 {
+    font-size: 1.25em; /* 也一併縮小 h2 */
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #dfe2e5;
+}
+
+.gemini-result-content h3 {
+    font-size: 1.1em;
+}
+
+.gemini-result-content h4 {
+    font-size: 1em;
+    color: #5f6368;
+}
+.gemini-result-content {
+    padding: 12px;
+    font-size: 15px;
+    line-height: 1.6;
+    flex: 1; /* 讓此元素填滿所有剩餘空間 */
+    overflow-y: auto; /* 當內容溢出時，內部出現滾動條 */
+    min-height: 0; /* flexbox 的小技巧，確保在縮小時能正常運作 */
+}
+
+/* 懸浮按鈕 (FAB) */
+#gemini-fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 56px;
+    height: 56px;
+    background-color: #4285F4;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    z-index: 2147483646;
+    transition: background-color 0.3s;
+}
+
+#gemini-fab-menu {
+    position: fixed;
+    bottom: 95px;
+    right: 30px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 2147483646;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+    transform-origin: bottom right;
+    transform: scale(0);
+    opacity: 0;
+    visibility: hidden;
+}
+
+#gemini-fab-menu.visible {
+    transform: scale(1);
+    opacity: 1;
+    visibility: visible;
+}
+
+.gemini-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    font-size: 14px;
+    min-width: 220px;
+}
+
+/* 開關 Switch UI */
+.gemini-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    margin-left: 16px;
+}
+
+.gemini-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.gemini-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 22px;
+}
+
+.gemini-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .gemini-slider {
+    background-color: #4285F4;
+}
+
+input:checked + .gemini-slider:before {
+    transform: translateX(18px);
+}
+
+
+/* ✨ ========================================================= ✨ */
+/* ✨         新增：Markdown 元素的美化樣式 (v3.7)             ✨ */
+/* ✨ ========================================================= ✨ */
+
+/* 為內容區塊內的所有段落提供基礎間距 */
+.gemini-result-content p {
+    margin-top: 0;
+    margin-bottom: 0.8em;
+}
+.gemini-result-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* 列表 (無序/有序) 樣式 */
+.gemini-result-content ul,
+.gemini-result-content ol {
+    padding-left: 22px; /* 增加一點內縮 */
+    margin-top: 0.5em;
+    margin-bottom: 0.8em;
+}
+
+.gemini-result-content li {
+    margin-bottom: 0.4em;
+    padding-left: 4px;
+}
+
+/* 粗體和斜體 */
+.gemini-result-content strong {
+    font-weight: 600;
+}
+
+/* 引言區塊樣式 */
+.gemini-result-content blockquote {
+    border-left: 4px solid #dfe2e5;
+    padding-left: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    color: #586069;
+}
+
+/* 行內程式碼樣式 */
+.gemini-result-content code {
+    background-color: rgba(27,31,35,0.07); /* 輕微加深背景 */
+    border-radius: 4px;
+    padding: 0.2em 0.4em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 0.9em;
+}
+
+/* 程式碼區塊樣式 (例如用 ``` 框起來的程式碼) */
+.gemini-result-content pre {
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    border: 1px solid #e1e4e8;
+}
+
+/* 針對 pre 內的 code，移除行內樣式，避免重複 */
+.gemini-result-content pre code {
+    background-color: transparent;
+    padding: 0;
+    font-size: 1em; /* 恢復正常字體大小 */
+    border: none;
+}
+
+
+.gemini-result-content .katex {
+    font-size: 1.1em; /* 讓公式稍微大一點，更易讀 */
+    line-height: inherit;
+    text-align: initial;
+}
+
+/* 讓區塊公式 (display mode) 有適當的上下間距 */
+.gemini-result-content .katex-display {
+    margin: 0.8em 0;
+    display: block;
+    text-align: center; /* 讓區塊公式置中 */
+}
+
+/* 如果公式過長，允許水平滾動，避免破壞佈局 */
+.gemini-result-content .katex-display > .katex {
+    display: inline-block;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px; /* 為滾動條預留一點空間 */
+}
+
+
+
+/* style.css (在檔案最下方更新/替換) */
+
+/* 選單分隔線的樣式 */
+.gemini-menu-separator {
+    height: 1px;
+    background-color: #e0e0e0; /* 淡灰色線條 */
+    margin: 6px 0; /* 上下邊距 */
+}
+
+/* PDF 連結區塊的容器樣式 */
+.gemini-menu-item.gemini-pdf-link-item {
+    flex-direction: column; /* 垂直排列 */
+    align-items: stretch;   /* 讓子元素(按鈕)的寬度填滿容器 */
+    padding: 12px 16px;     /* 調整內邊距 */
+}
+
+/* ✨ 將原本的 a 連結修改為【藍色按鈕樣式】 ✨ */
+.gemini-pdf-link-item a {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    box-sizing: border-box;
+
+    background-color: #86d4fc; /* 改為淺灰色背景 */
+    color: #202124;           /* 改為接近純黑的深色文字 */
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    border: 1px solid #dadce0; /* 加上一個細邊框，讓按鈕在白色選單上更立體 */
+    
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* 按鈕的滑鼠懸停效果 */
+.gemini-pdf-link-item a:hover {
+    background-color: #e8eaed; /* 滑鼠移過時，背景變成稍深的灰色 */
+    text-decoration: none;
+}
+
+/* 下方說明文字的樣式 */
+.gemini-pdf-link-item small {
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 8px; /* 增加按鈕和說明文字之間的距離 */
+    line-height: 1.4;
+    text-align: center; /* 讓說明文字也置中，與按鈕對齊 */
+}
+
+/* 確保選單有足夠的寬度容納新內容 */
+#gemini-fab-menu {
+    min-width: 250px;
+}
