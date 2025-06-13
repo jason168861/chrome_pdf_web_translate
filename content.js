@@ -1,6 +1,6 @@
-// content.js (v3.6 - 整合版，新增「解釋」功能)
+// content.js (v3.8 - 整合版，為 PDF 和通用頁面新增聊天功能)
 // 版本說明：此腳本整合了針對 PDF 檢視器和通用網站的兩種不同邏輯。
-// 它會自動偵測當前頁面網址，並執行對應的程式碼。
+// 新增的聊天室功能已分別適配兩種邏輯，以確保原有功能穩定。
 
 (function() {
     "use strict";
@@ -21,63 +21,39 @@
     // =================== 邏輯 A: 專為 https://jason168861.github.io/my-pdf-viewer/ 設計 ===================
     // ===================================================================================
     function runPdfViewerLogic() {
-        // 請將此程式碼區塊貼在 runPdfViewerLogic() 和 runGenericLogic() 的開頭
-(function injectKaTeXFontPaths() {
-    // KaTeX 使用的主要字型列表
-    const KATEX_FONTS = [
-        "KaTeX_AMS-Regular", "KaTeX_Caligraphic-Bold", "KaTeX_Caligraphic-Regular",
-        "KaTeX_Fraktur-Bold", "KaTeX_Fraktur-Regular", "KaTeX_Main-Bold",
-        "KaTeX_Main-BoldItalic", "KaTeX_Main-Italic", "KaTeX_Main-Regular",
-        "KaTeX_Math-BoldItalic", "KaTeX_Math-Italic", "KaTeX_SansSerif-Bold",
-        "KaTeX_SansSerif-Italic", "KaTeX_SansSerif-Regular", "KaTeX_Script-Regular",
-        "KaTeX_Size1-Regular", "KaTeX_Size2-Regular", "KaTeX_Size3-Regular",
-        "KaTeX_Size4-Regular", "KaTeX_Typewriter-Regular"
-    ];
-    
-    // 定義字型格式
-    const FONT_FORMATS = {
-        "woff2": "woff2",
-        "woff": "woff",
-        "ttf": "truetype"
-    };
-
-    let css = '';
-    
-    // 遍歷所有字型和格式，產生 CSS 的 @font-face 規則
-    for (const font of KATEX_FONTS) {
-        let srcList = [];
-        for (const format in FONT_FORMATS) {
-            // 使用 chrome.runtime.getURL() 獲取擴充功能內檔案的絕對路徑
-            const url = chrome.runtime.getURL(`fonts/${font}.${format}`);
-            srcList.push(`url(${url}) format('${FONT_FORMATS[format]}')`);
-        }
-        
-        css += `
-            @font-face {
-                font-family: '${font.split('-')[0]}';
-                src: ${srcList.join(',\n' + ' '.repeat(17))};
-                font-style: ${font.includes('Italic') ? 'italic' : 'normal'};
-                font-weight: ${font.includes('Bold') ? 'bold' : 'normal'};
+        (function injectKaTeXFontPaths() {
+            const KATEX_FONTS=["KaTeX_AMS-Regular","KaTeX_Caligraphic-Bold","KaTeX_Caligraphic-Regular","KaTeX_Fraktur-Bold","KaTeX_Fraktur-Regular","KaTeX_Main-Bold","KaTeX_Main-BoldItalic","KaTeX_Main-Italic","KaTeX_Main-Regular","KaTeX_Math-BoldItalic","KaTeX_Math-Italic","KaTeX_SansSerif-Bold","KaTeX_SansSerif-Italic","KaTeX_SansSerif-Regular","KaTeX_Script-Regular","KaTeX_Size1-Regular","KaTeX_Size2-Regular","KaTeX_Size3-Regular","KaTeX_Size4-Regular","KaTeX_Typewriter-Regular"];
+            const FONT_FORMATS={"woff2":"woff2","woff":"woff","ttf":"truetype"};
+            let css='';
+            for(const font of KATEX_FONTS){
+                let srcList=[];
+                for(const format in FONT_FORMATS){
+                    const url=chrome.runtime.getURL(`fonts/${font}.${format}`);
+                    srcList.push(`url(${url}) format('${FONT_FORMATS[format]}')`);
+                }
+                css+=`
+                    @font-face {
+                        font-family: '${font.split('-')[0]}';
+                        src: ${srcList.join(',\n' + ' '.repeat(17))};
+                        font-style: ${font.includes('Italic')?'italic':'normal'};
+                        font-weight: ${font.includes('Bold')?'bold':'normal'};
+                    }
+                `;
             }
-        `;
-    }
-
-    // 建立一個 <style> 標籤並將產生的 CSS 注入到網頁的 <head> 中
-    const styleElement = document.createElement('style');
-    styleElement.textContent = css;
-    (document.head || document.documentElement).appendChild(styleElement);
-    console.log('[Gemini] KaTeX 字型路徑已動態注入。');
-})();
-        console.log("--- Gemini 翻譯/解釋插件 content.js v3.6 (PDF 專用版) 開始載入... ---");
+            const styleElement=document.createElement('style');
+            styleElement.textContent=css;
+            (document.head || document.documentElement).appendChild(styleElement);
+            console.log('[Gemini] KaTeX 字型路徑已動態注入。');
+        })();
+        console.log("--- Gemini 翻譯/解釋/聊天插件 content.js v3.8 (PDF 專用版) 開始載入... ---");
 
         let isTranslatorEnabled = true;
         let activeInstances = {};
         let isUpdateLoopRunning = false;
         let isProcessingUITranslation = false;
-        
+        let chatImageCache = null; // ✨ NEW: 聊天相關的狀態變數
         const pdfViewer = document.getElementById('pdf-viewer');
 
-        // ✨ 修改：promoteTriggerToBox 函式現在需要知道是「翻譯」還是「解釋」
         function promoteTriggerToBox(instanceId, requestType = 'translate') {
             const instance = activeInstances[instanceId];
             if (!instance || instance.type !== 'trigger') return;
@@ -97,7 +73,6 @@
             box.dataset.instanceId = instanceId;
             box.style.position = 'absolute';
 
-            // ✨ 修改：根據要求類型顯示不同的標題和初始訊息
             const title = requestType === 'translate' ? 'Gemini 翻譯' : 'Gemini 解釋';
             const loadingMessage = requestType === 'translate' ? '正在翻譯中...' : '正在產生解釋...';
 
@@ -118,7 +93,6 @@
                 cleanupInstance(instanceId);
             });
 
-            // ✨ 修改：發送包含 requestType 的訊息給 background.js
             console.log(`[Gemini] 發送 ${requestType} 請求 (ID: ${instanceId})，內容為: "${instance.text}"`);
             chrome.runtime.sendMessage({ action: requestType, text: instance.text, instanceId: instanceId });
 
@@ -133,44 +107,37 @@
             }, 120000);
         }
 
-        function makeResultBoxDraggable(element, handle, instanceId) {
-            handle.onmousedown = (e) => {
-                if (e.target.classList.contains('gemini-close-btn')) {
-                    return;
-                }
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const instance = activeInstances[instanceId];
-                if (!instance) return;
+        function makeResultBoxDraggable(element, handle, instanceId) {
+            handle.onmousedown = (e) => {
+                if (e.target.classList.contains('gemini-close-btn')) {
+                    return;
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const instance = activeInstances[instanceId];
+                if (!instance) return;
 
-                instance.isBeingDragged = true;
+                instance.isBeingDragged = true;
 
-                let shiftX = e.clientX - element.getBoundingClientRect().left;
-                let shiftY = e.clientY - element.getBoundingClientRect().top;
+                let shiftX = e.clientX - element.getBoundingClientRect().left;
+                let shiftY = e.clientY - element.getBoundingClientRect().top;
 
-                // ✨ --- 修正開始 --- ✨
-                // 1. 找到內容的 div
                 const contentDiv = element.querySelector('.gemini-result-content');
-                // 2. 在移動 DOM 前，記住當前的滾動位置
                 const currentScrollTop = contentDiv.scrollTop;
                 const currentScrollLeft = contentDiv.scrollLeft;
-                // ✨ --- 修正結束 --- ✨
 
-                document.body.append(element);
-                element.style.position = 'absolute';
+                document.body.append(element);
+                element.style.position = 'absolute';
                 
-                // ✨ --- 修正開始 --- ✨
-                // 3. 移動 DOM 後，立刻還原滾動位置
                 contentDiv.scrollTop = currentScrollTop;
                 contentDiv.scrollLeft = currentScrollLeft;
-                // ✨ --- 修正結束 --- ✨
-                
-                function moveAt(pageX, pageY) {
-                    element.style.left = `${pageX - shiftX}px`;
-                    element.style.top = `${pageY - shiftY}px`;
-                }
+                
+                function moveAt(pageX, pageY) {
+                    element.style.left = `${pageX - shiftX}px`;
+                    element.style.top = `${pageY - shiftY}px`;
+                }
                 moveAt(e.pageX, e.pageY);
 
                 function onMouseMove(event) {
@@ -235,96 +202,85 @@
             }
         }
 
-function masterUpdateLoop() {
-    if (!isUpdateLoopRunning) return;
+        function masterUpdateLoop() {
+            if (!isUpdateLoopRunning) return;
 
-    const idsToDelete = [];
+            const idsToDelete = [];
 
-    for (const instanceId in activeInstances) {
-        const instance = activeInstances[instanceId];
+            for (const instanceId in activeInstances) {
+                const instance = activeInstances[instanceId];
 
-        if (instance.isBeingDragged) {
-            continue;
-        }
-        
-        const anchor = instance.anchor;
-        if (!anchor || !document.body.contains(anchor)) {
-            idsToDelete.push(instanceId);
-            continue;
-        }
+                if (instance.isBeingDragged) {
+                    continue;
+                }
+                
+                const anchor = instance.anchor;
+                if (!anchor || !document.body.contains(anchor)) {
+                    idsToDelete.push(instanceId);
+                    continue;
+                }
 
-        const elementToPosition = instance.type === 'trigger' ? instance.trigger : instance.box;
-        if (!elementToPosition) continue;
+                const elementToPosition = instance.type === 'trigger' ? instance.trigger : instance.box;
+                if (!elementToPosition) continue;
 
-        const anchorRect = anchor.getBoundingClientRect();
-        
-        const anchorAbsoluteTop = anchorRect.top + window.scrollY;
-        const anchorAbsoluteLeft = anchorRect.left + window.scrollX;
+                const anchorRect = anchor.getBoundingClientRect();
+                
+                const anchorAbsoluteTop = anchorRect.top + window.scrollY;
+                const anchorAbsoluteLeft = anchorRect.left + window.scrollX;
 
-        if (instance.isManuallyPositioned) {
-            elementToPosition.style.top = `${anchorAbsoluteTop + instance.manualOffset.top}px`;
-            elementToPosition.style.left = `${anchorAbsoluteLeft + instance.manualOffset.left}px`;
-        } else {
-                if (!instance.initialOffset) {
-                    const selection = window.getSelection();
-                    if (selection && !selection.isCollapsed) {
-                        
-                        // ✨ --- 這是核心修改：將觸發按鈕定位於選取文字的「末端」--- ✨
-                        // 1. 複製當前的選取範圍
-                        const endRange = selection.getRangeAt(0).cloneRange();
-                        // 2. 將複製的範圍收起到其「結束點」(這是關鍵修改！)
-                        endRange.collapse(false); // 將 true 改為 false
-                        // 3. 取得這個「結束點」的座標方框
-                        const endRect = endRange.getBoundingClientRect();
-                        // ✨ --- 修改結束 --- ✨
+                if (instance.isManuallyPositioned) {
+                    elementToPosition.style.top = `${anchorAbsoluteTop + instance.manualOffset.top}px`;
+                    elementToPosition.style.left = `${anchorAbsoluteLeft + instance.manualOffset.left}px`;
+                } else {
+                        if (!instance.initialOffset) {
+                            const selection = window.getSelection();
+                            if (selection && !selection.isCollapsed) {
+                                
+                                const endRange = selection.getRangeAt(0).cloneRange();
+                                endRange.collapse(false);
+                                const endRect = endRange.getBoundingClientRect();
 
-                        instance.initialOffset = {
-                            // 使用結束點的底部和左側來計算偏移
-                            top: (endRect.bottom + window.scrollY) - anchorAbsoluteTop,
-                            left: (endRect.left + window.scrollX) - anchorAbsoluteLeft
-                        };
-                    } else {
-                        instance.initialOffset = { top: 20, left: 0 };
-                    }
-                }
+                                instance.initialOffset = {
+                                    top: (endRect.bottom + window.scrollY) - anchorAbsoluteTop,
+                                    left: (endRect.left + window.scrollX) - anchorAbsoluteLeft
+                                };
+                            } else {
+                                instance.initialOffset = { top: 20, left: 0 };
+                            }
+                        }
+                    
+                    const yOffset = instance.type === 'trigger' ? 5 : 15;
+                    elementToPosition.style.top = `${anchorAbsoluteTop + instance.initialOffset.top + yOffset}px`;
+                    elementToPosition.style.left = `${anchorAbsoluteLeft + instance.initialOffset.left}px`;
+                }
+            }
             
-            const yOffset = instance.type === 'trigger' ? 5 : 15;
-            elementToPosition.style.top = `${anchorAbsoluteTop + instance.initialOffset.top + yOffset}px`;
-            elementToPosition.style.left = `${anchorAbsoluteLeft + instance.initialOffset.left}px`;
-        }
-    }
-    
-    idsToDelete.forEach(id => cleanupInstance(id));
+            idsToDelete.forEach(id => cleanupInstance(id));
 
-    requestAnimationFrame(masterUpdateLoop);
-}
+            requestAnimationFrame(masterUpdateLoop);
+        }
 
         function createTriggerInstance(selection) {
             const instanceId = `gemini-instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const range = selection.getRangeAt(0);
 
             const pageContainer = range.startContainer.parentElement.closest('.page-container');
-            // if (!pageContainer) {
-            //     console.warn("[Gemini] 選取範圍不在可識別的 .page-container 內，取消觸發。");
-            //     return;
-            // }
+            if (!pageContainer) {
+                console.warn("[Gemini] 選取範圍不在可識別的 .page-container 內，取消觸發。");
+                return;
+            }
 
             const textToTranslate = selection.toString();
             
-            // ✨ 新增：創建一個容器來放置兩個按鈕
             const triggerContainer = document.createElement('div');
             triggerContainer.className = 'gemini-selection-trigger-container gemini-ui-element';
             triggerContainer.dataset.instanceId = instanceId;
             triggerContainer.style.position = 'absolute';
-            triggerContainer.style.display = 'flex'; // 讓按鈕並排
-            triggerContainer.style.gap = '5px'; // 按鈕間距
 
-            // 創建翻譯按鈕
             const translateButton = document.createElement('div');
             translateButton.className = 'gemini-selection-trigger';
             translateButton.innerText = '翻譯';
 
-            // 創建解釋按鈕
             const explainButton = document.createElement('div');
             explainButton.className = 'gemini-selection-trigger';
             explainButton.innerText = '解釋';
@@ -337,26 +293,25 @@ function masterUpdateLoop() {
                 id: instanceId,
                 type: 'trigger',
                 anchor: pageContainer, 
-                trigger: triggerContainer, // ✨ 修改：現在 trigger 是指按鈕容器
+                trigger: triggerContainer,
                 text: textToTranslate,
                 initialOffset: null, 
                 manualOffset: { top: 0, left: 0 },
                 isManuallyPositioned: false
             };
 
-            // ✨ 修改：為兩個按鈕分別添加事件監聽
             translateButton.addEventListener('mousedown', (e) => {
                 e.preventDefault(); 
                 e.stopPropagation();
                 isProcessingUITranslation = true;
-                promoteTriggerToBox(instanceId, 'translate'); // 傳遞 'translate'
+                promoteTriggerToBox(instanceId, 'translate');
             });
 
             explainButton.addEventListener('mousedown', (e) => {
                 e.preventDefault(); 
                 e.stopPropagation();
                 isProcessingUITranslation = true;
-                promoteTriggerToBox(instanceId, 'explain'); // 傳遞 'explain'
+                promoteTriggerToBox(instanceId, 'explain');
             });
 
             if (!isUpdateLoopRunning) {
@@ -401,97 +356,69 @@ function masterUpdateLoop() {
         function stopMasterUpdateLoop() {
             isUpdateLoopRunning = false;
         }
-        
-        function main() {
-            initializeTranslatorFeatures();
-        }
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', main);
-        } else {
-            main();
-        }
-
-chrome.runtime.onMessage.addListener((request, sender) => {
-    if ((request.action === 'translationResult' || request.action === 'explanationResult') && request.instanceId) {
-        const instance = activeInstances[request.instanceId];
-        if (instance && instance.type === 'box' && instance.box) {
-            if (instance.translationTimeout) {
-                clearTimeout(instance.translationTimeout);
+        // ✨ MODIFIED: onMessage listener 現在要處理更多種回覆
+        chrome.runtime.onMessage.addListener((request, sender) => {
+            if ((request.action === 'translationResult' || request.action === 'explanationResult') && request.instanceId) {
+                const instance = activeInstances[request.instanceId];
+                if (instance && instance.type === 'box' && instance.box) {
+                    if (instance.translationTimeout) clearTimeout(instance.translationTimeout);
+                    const contentDiv = instance.box.querySelector('.gemini-result-content');
+                    if (request.isError) {
+                        contentDiv.innerHTML = `<span style="color: red;">${request.text}</span>`;
+                        return;
+                    }
+                    renderMarkdownAndMath(contentDiv, request.text);
+                }
+                return;
             }
+            if (request.action === 'chatResult') {
+                removeChatLoading();
+                if (request.isError) {
+                    addMessageToChat('system', request.text);
+                } else {
+                    addMessageToChat('model', request.text);
+                }
+                return;
+            }
+            if (request.action === 'historyCleared') {
+                const messagesDiv = document.getElementById('gemini-chat-messages');
+                if(messagesDiv) messagesDiv.innerHTML = '';
+                addMessageToChat('system', request.text);
+                return;
+            }
+        });
 
-            const contentDiv = instance.box.querySelector('.gemini-result-content');
-
-            // ✨ --- 解決 Markdown 與 LaTeX 語法衝突的核心修改 --- ✨
-
-            /**
-             * 保護數學公式，防止被 marked.js 誤解析。
-             * @param {string} text - 從 Gemini 收到的原始文字
-             * @returns {string} - 保護好數學公式後的文字
-             */
+        // ✨ NEW: 渲染 Markdown 和數學公式的通用函式
+        function renderMarkdownAndMath(element, text) {
             function protectMath(text) {
                 return text.replace(/\$\$([\s\S]*?)\$\$|\$([^\$\n]+?)\$/g, (match, blockContent, inlineContent) => {
                     const content = blockContent || inlineContent;
-                    
-                    // ✨ --- 這是唯一的修改處 --- ✨
-                    // 在鏈式呼叫中，新增 .replace(/\*/g, '\\*') 來保護星號
-                    const escapedContent = content.replace(/_/g, '\\_')
-                                                  .replace(/\^/g, '\\^')
-                                                  .replace(/\*/g, '\\*');
-                    
-                    if (blockContent) {
-                        return `$$${escapedContent}$$`;
-                    } else {
-                        return `$${escapedContent}$`;
-                    }
+                    const escapedContent = content.replace(/_/g, '\\_').replace(/\^/g, '\\^').replace(/\*/g, '\\*');
+                    return blockContent ? `$$${escapedContent}$$` : `$${escapedContent}$`;
                 });
             }
-
-            // 步驟 1: 先用我們的保護函式處理原始文字
-            const protectedText = protectMath(request.text);
-            console.log(`[Gemini] 收到 ${request.action === 'translationResult' ? '翻譯' : '解釋'}結果 (ID: ${request.instanceId})，內容為: "${protectedText}"`);
-            
-            // 步驟 2: 再將保護後的文字交給 marked.js 解析
+            const protectedText = protectMath(text);
             let htmlContent;
             if (window.marked) {
-                try {
-                    htmlContent = window.marked.parse(protectedText);
-                } catch (e) {
+                try { htmlContent = window.marked.parse(protectedText); } catch (e) {
                     console.error('[Gemini] marked.js 解析時發生錯誤:', e);
-                    htmlContent = protectedText;
+                    htmlContent = protectedText.replace(/\n/g, '<br>');
                 }
             } else {
                 console.error('[Gemini] marked.js 函式庫未載入！');
                 htmlContent = protectedText.replace(/\n/g, '<br>');
             }
-            console.log('[Gemini] 解析後的 HTML 內容:', htmlContent);
-            // 步驟 3: 將 HTML 內容寫入結果框
-            contentDiv.innerHTML = htmlContent;
-
-            // 步驟 4: 最後，呼叫 KaTeX 渲染所有數學公式 (它能正確處理我們之前加入的轉義字元)
+            element.innerHTML = htmlContent;
             if (window.renderMathInElement) {
                 try {
-                    renderMathInElement(contentDiv, {
-                        delimiters: [
-                            {left: "$$", right: "$$", display: true},
-                            {left: "$", right: "$", display: false}
-                        ],
+                    renderMathInElement(element, {
+                        delimiters: [{left: "$$", right: "$$", display: true}, {left: "$", right: "$", display: false}],
                         throwOnError: false
                     });
-                    console.log('[Gemini] KaTeX 渲染完成。');
-                } catch (e) {
-                    console.error('[Gemini] KaTeX 渲染時發生錯誤:', e);
-                }
-            } else {
-                console.error('[Gemini] KaTeX 的 renderMathInElement 函式未找到！');
-            }
-
-            // ✨ --- 修改結束 --- ✨
-
-            contentDiv.style.color = '';
+                } catch (e) { console.error('[Gemini] KaTeX 渲染時發生錯誤:', e); }
+            } else { console.error('[Gemini] KaTeX 的 renderMathInElement 函式未找到！'); }
         }
-    }
-});
 
         function updateFabState() {
             const fab = document.getElementById('gemini-fab');
@@ -512,6 +439,8 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                 if (!isTranslatorEnabled) {
                     cleanupAllTriggers();
                     Object.keys(activeInstances).forEach(cleanupInstance);
+                    const fabMenu = document.getElementById('gemini-fab-menu');
+                    if(fabMenu) fabMenu.classList.remove('visible');
                 }
             }
         });
@@ -523,16 +452,223 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             updateFabState();
         }
 
+        // ✨ MODIFIED: 大幅修改，建立主選單和聊天介面
         function createFabAndMenu() {
             const fab = document.createElement('div');
             fab.id = 'gemini-fab';
             fab.innerText = 'G';
             document.body.appendChild(fab);
+
             const fabMenu = document.createElement('div');
             fabMenu.id = 'gemini-fab-menu';
-            // ✨ 修改：更新選單文字，使其更通用
-            fabMenu.innerHTML = `<div class="gemini-menu-item"><span>啟用 Gemini 功能</span><label class="gemini-switch"><input type="checkbox" id="gemini-enable-switch" ${isTranslatorEnabled ? 'checked' : ''}><span class="gemini-slider"></span></label></div>`;
+            fabMenu.classList.add('gemini-ui-element');
+
+            const isEnabled = isTranslatorEnabled ? 'checked' : '';
+
+            // 主選單介面 (PDF 版沒有 PDF 連結)
+            const mainMenuHTML = `
+                <div id="gemini-menu-main" style="width: 100%;">
+                    <div class="gemini-menu-item" id="gemini-open-chat-btn">
+                        <span>💬 開啟 Gemini 聊天室</span>
+                    </div>
+                    <div class="gemini-menu-separator"></div>
+                    <div class="gemini-menu-item">
+                        <span>啟用 Gemini 功能</span>
+                        <label class="gemini-switch">
+                            <input type="checkbox" id="gemini-enable-switch" ${isEnabled}>
+                            <span class="gemini-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            `;
+
+            const chatViewHTML = `
+                <div id="gemini-chat-view" style="display: none;">
+                    <div id="gemini-chat-header">
+                        <button id="gemini-chat-back-btn" title="返回主選單">‹</button>
+                        <span id="gemini-chat-title">Gemini 聊天室</span>
+                        <button id="gemini-chat-clear-btn" title="清除聊天記錄">🗑️</button>
+                    </div>
+                    <div id="gemini-chat-messages"></div>
+                    <div id="gemini-chat-input-container">
+                         <div id="gemini-chat-file-preview" style="display: none;"></div>
+                         <form id="gemini-chat-input-form">
+                             <label for="gemini-chat-file-input" id="gemini-chat-file-label" title="上傳圖片/檔案">
+                                 <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"></path></svg>
+                             </label>
+                             <input type="file" id="gemini-chat-file-input" accept="image/jpeg,image/png,image/webp,image/heic">
+                             <textarea id="gemini-chat-textarea" rows="1" placeholder="輸入訊息..."></textarea>
+                             <button type="submit" id="gemini-chat-send-btn" title="傳送">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                             </button>
+                         </form>
+                    </div>
+                </div>
+            `;
+
+            fabMenu.innerHTML = mainMenuHTML + chatViewHTML;
             document.body.appendChild(fabMenu);
+            setupChatListeners();
+        }
+        // ✨ NEW: 處理圖片檔案的邏輯被抽成一個可重複使用的函式
+        function handleImageFile(file) {
+            // 確保傳入的是一個圖片檔案
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                chatImageCache = event.target.result;
+                const filePreview = document.getElementById('gemini-chat-file-preview');
+                
+                // 建立預覽畫面和移除按鈕
+                filePreview.innerHTML = `<img src="${chatImageCache}" alt="Preview"><button id="gemini-chat-remove-file">&times;</button>`;
+                filePreview.style.display = 'block';
+
+                // 為移除按鈕加上事件監聽
+                document.getElementById('gemini-chat-remove-file').addEventListener('click', () => {
+                    filePreview.style.display = 'none';
+                    filePreview.innerHTML = '';
+                    chatImageCache = null;
+                    // 重設 input 的值，這樣才能再次選擇同一個檔案
+                    document.getElementById('gemini-chat-file-input').value = ''; 
+                });
+            };
+            // 讀取檔案並轉為 Base64
+            reader.readAsDataURL(file);
+        }
+// ✨ MODIFIED: 此函式已更新，以整合貼上圖片功能
+function setupChatListeners() {
+    const mainMenu = document.getElementById('gemini-menu-main');
+    const chatView = document.getElementById('gemini-chat-view');
+    const fileInput = document.getElementById('gemini-chat-file-input');
+    const textarea = document.getElementById('gemini-chat-textarea');
+    const form = document.getElementById('gemini-chat-input-form');
+
+    // --- 按鈕切換邏輯 (維持不變) ---
+    document.getElementById('gemini-open-chat-btn').addEventListener('click', () => {
+        mainMenu.style.display = 'none';
+        chatView.style.display = 'flex';
+        if (document.getElementById('gemini-chat-messages').childElementCount === 0) {
+            addMessageToChat('system', '你好！我可以為你做什麼？');
+        }
+    });
+    document.getElementById('gemini-chat-back-btn').addEventListener('click', () => {
+        chatView.style.display = 'none';
+        mainMenu.style.display = 'block';
+    });
+    document.getElementById('gemini-chat-clear-btn').addEventListener('click', () => {
+        if(confirm('確定要清除本次的所有聊天記錄嗎？')) {
+            chrome.runtime.sendMessage({ action: 'clearChatHistory' });
+        }
+    });
+
+    // ✨ MODIFIED: 檔案上傳監聽器現在呼叫新的輔助函式，程式碼更簡潔
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            handleImageFile(file);
+        }
+    });
+
+    // ✨ NEW: 為輸入框新增貼上事件的監聽器
+    textarea.addEventListener('paste', (e) => {
+        // 取得剪貼簿中的項目
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        let imageFound = false;
+        
+        for (const item of items) {
+            // 如果項目是檔案且類型為圖片
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const imageFile = item.getAsFile();
+                handleImageFile(imageFile); // 使用剛剛建立的輔助函式處理
+                imageFound = true;
+                break; // 只處理第一張圖片
+            }
+        }
+
+        // 如果貼上的是圖片，就阻止瀏覽器的預設貼上行為(例如貼上檔案路徑文字)
+        if (imageFound) {
+            e.preventDefault();
+        }
+    });
+
+
+    // --- 輸入與傳送邏輯 (維持不變) ---
+    textarea.addEventListener('input', () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const prompt = textarea.value.trim();
+        if (!prompt && !chatImageCache) return;
+
+        addMessageToChat('user', prompt, chatImageCache);
+        chrome.runtime.sendMessage({
+            action: 'chat',
+            prompt: prompt,
+            imageDataUrl: chatImageCache
+        });
+
+        // 重設輸入區
+        textarea.value = '';
+        textarea.style.height = 'auto';
+        chatImageCache = null;
+        const filePreview = document.getElementById('gemini-chat-file-preview');
+        filePreview.style.display = 'none';
+        filePreview.innerHTML = '';
+        fileInput.value = '';
+
+        addChatLoading();
+    });
+}
+        // ✨ NEW: 新增/移除聊天載入動畫的函式
+        function addChatLoading() {
+            const messagesDiv = document.getElementById('gemini-chat-messages');
+            if (document.getElementById('gemini-chat-loader-msg')) return;
+            const loaderMessage = document.createElement('div');
+            loaderMessage.id = 'gemini-chat-loader-msg';
+            loaderMessage.className = 'gemini-chat-message model';
+            loaderMessage.innerHTML = `<div class="gemini-chat-loader"><span></span><span></span><span></span></div>`;
+            messagesDiv.appendChild(loaderMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        function removeChatLoading() {
+            const loaderMessage = document.getElementById('gemini-chat-loader-msg');
+            if (loaderMessage) loaderMessage.remove();
+        }
+
+        // ✨ NEW: 將訊息加入聊天畫面的函式
+        function addMessageToChat(role, text, imageUrl = null) {
+            const messagesDiv = document.getElementById('gemini-chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `gemini-chat-message ${role}`;
+
+            if (role === 'model') {
+                 renderMarkdownAndMath(messageDiv, text);
+            } else {
+                 const textNode = document.createElement('div');
+                 textNode.textContent = text;
+                 messageDiv.appendChild(textNode);
+            }
+
+            if (imageUrl) {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.className = 'gemini-chat-image-preview';
+                messageDiv.appendChild(img);
+            }
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
         function setupGlobalListeners() {
@@ -571,10 +707,24 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                     fabMenu.classList.remove('visible');
                 }
                 const enableSwitch = document.getElementById('gemini-enable-switch');
-                if (enableSwitch && e.target === enableSwitch) {
-                    chrome.storage.sync.set({ isTranslatorEnabled: e.target.checked });
+                if (enableSwitch && e.target.closest('.gemini-switch')) {
+                     const checkbox = e.target.closest('.gemini-switch').querySelector('input');
+                     if(checkbox) {
+                        const isChecked = e.target === checkbox ? checkbox.checked : !checkbox.checked;
+                        chrome.storage.sync.set({ isTranslatorEnabled: isChecked });
+                     }
                 }
             });
+        }
+        
+        function main() {
+            initializeTranslatorFeatures();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
         }
     }
 
@@ -583,61 +733,38 @@ chrome.runtime.onMessage.addListener((request, sender) => {
     // ============================= 邏輯 B: 用於所有其他通用網站 =============================
     // ===================================================================================
     function runGenericLogic() {
-        // 請將此程式碼區塊貼在 runPdfViewerLogic() 和 runGenericLogic() 的開頭
-(function injectKaTeXFontPaths() {
-    // KaTeX 使用的主要字型列表
-    const KATEX_FONTS = [
-        "KaTeX_AMS-Regular", "KaTeX_Caligraphic-Bold", "KaTeX_Caligraphic-Regular",
-        "KaTeX_Fraktur-Bold", "KaTeX_Fraktur-Regular", "KaTeX_Main-Bold",
-        "KaTeX_Main-BoldItalic", "KaTeX_Main-Italic", "KaTeX_Main-Regular",
-        "KaTeX_Math-BoldItalic", "KaTeX_Math-Italic", "KaTeX_SansSerif-Bold",
-        "KaTeX_SansSerif-Italic", "KaTeX_SansSerif-Regular", "KaTeX_Script-Regular",
-        "KaTeX_Size1-Regular", "KaTeX_Size2-Regular", "KaTeX_Size3-Regular",
-        "KaTeX_Size4-Regular", "KaTeX_Typewriter-Regular"
-    ];
-    
-    // 定義字型格式
-    const FONT_FORMATS = {
-        "woff2": "woff2",
-        "woff": "woff",
-        "ttf": "truetype"
-    };
-
-    let css = '';
-    
-    // 遍歷所有字型和格式，產生 CSS 的 @font-face 規則
-    for (const font of KATEX_FONTS) {
-        let srcList = [];
-        for (const format in FONT_FORMATS) {
-            // 使用 chrome.runtime.getURL() 獲取擴充功能內檔案的絕對路徑
-            const url = chrome.runtime.getURL(`fonts/${font}.${format}`);
-            srcList.push(`url(${url}) format('${FONT_FORMATS[format]}')`);
-        }
-        
-        css += `
-            @font-face {
-                font-family: '${font.split('-')[0]}';
-                src: ${srcList.join(',\n' + ' '.repeat(17))};
-                font-style: ${font.includes('Italic') ? 'italic' : 'normal'};
-                font-weight: ${font.includes('Bold') ? 'bold' : 'normal'};
+        (function injectKaTeXFontPaths() {
+            const KATEX_FONTS=["KaTeX_AMS-Regular","KaTeX_Caligraphic-Bold","KaTeX_Caligraphic-Regular","KaTeX_Fraktur-Bold","KaTeX_Fraktur-Regular","KaTeX_Main-Bold","KaTeX_Main-BoldItalic","KaTeX_Main-Italic","KaTeX_Main-Regular","KaTeX_Math-BoldItalic","KaTeX_Math-Italic","KaTeX_SansSerif-Bold","KaTeX_SansSerif-Italic","KaTeX_SansSerif-Regular","KaTeX_Script-Regular","KaTeX_Size1-Regular","KaTeX_Size2-Regular","KaTeX_Size3-Regular","KaTeX_Size4-Regular","KaTeX_Typewriter-Regular"];
+            const FONT_FORMATS={"woff2":"woff2","woff":"woff","ttf":"truetype"};
+            let css='';
+            for(const font of KATEX_FONTS){
+                let srcList=[];
+                for(const format in FONT_FORMATS){
+                    const url=chrome.runtime.getURL(`fonts/${font}.${format}`);
+                    srcList.push(`url(${url}) format('${FONT_FORMATS[format]}')`);
+                }
+                css+=`
+                    @font-face {
+                        font-family: '${font.split('-')[0]}';
+                        src: ${srcList.join(',\n' + ' '.repeat(17))};
+                        font-style: ${font.includes('Italic')?'italic':'normal'};
+                        font-weight: ${font.includes('Bold')?'bold':'normal'};
+                    }
+                `;
             }
-        `;
-    }
-
-    // 建立一個 <style> 標籤並將產生的 CSS 注入到網頁的 <head> 中
-    const styleElement = document.createElement('style');
-    styleElement.textContent = css;
-    (document.head || document.documentElement).appendChild(styleElement);
-    console.log('[Gemini] KaTeX 字型路徑已動態注入。');
-})();
-        console.log("--- Gemini 翻譯/解釋插件 content.js v3.6 (通用版) 開始載入... ---");
+            const styleElement=document.createElement('style');
+            styleElement.textContent=css;
+            (document.head || document.documentElement).appendChild(styleElement);
+            console.log('[Gemini] KaTeX 字型路徑已動態注入。');
+        })();
+        console.log("--- Gemini 翻譯/解釋/聊天插件 content.js v3.8 (通用版) 開始載入... ---");
 
         let isTranslatorEnabled = true;
         let activeInstances = {};
         let isUpdateLoopRunning = false;
         let isProcessingUITranslation = false;
+        let chatImageCache = null; // ✨ NEW: 聊天相關的狀態變數
         
-        // ✨ 修改：promoteTriggerToBox 函式現在需要知道是「翻譯」還是「解釋」
         function promoteTriggerToBox(instanceId, requestType = 'translate') {
             const instance = activeInstances[instanceId];
             if (!instance || instance.type !== 'trigger') return;
@@ -657,7 +784,6 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             box.dataset.instanceId = instanceId;
             box.style.position = 'absolute';
 
-            // ✨ 修改：根據要求類型顯示不同的標題和初始訊息
             const title = requestType === 'translate' ? 'Gemini 翻譯' : 'Gemini 解釋';
             const loadingMessage = requestType === 'translate' ? '正在翻譯中...' : '正在產生解釋...';
             
@@ -678,7 +804,6 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                 cleanupInstance(instanceId);
             });
 
-            // ✨ 修改：發送包含 requestType 的訊息給 background.js
             console.log(`[Gemini] 發送 ${requestType} 請求 (ID: ${instanceId})，內容為: "${instance.text}"`);
             chrome.runtime.sendMessage({ action: requestType, text: instance.text, instanceId: instanceId });
 
@@ -693,44 +818,37 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             }, 120000);
         }
 
-        function makeResultBoxDraggable(element, handle, instanceId) {
-            handle.onmousedown = (e) => {
-                if (e.target.classList.contains('gemini-close-btn')) {
-                    return;
-                }
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const instance = activeInstances[instanceId];
-                if (!instance) return;
+        function makeResultBoxDraggable(element, handle, instanceId) {
+            handle.onmousedown = (e) => {
+                if (e.target.classList.contains('gemini-close-btn')) {
+                    return;
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const instance = activeInstances[instanceId];
+                if (!instance) return;
 
-                instance.isBeingDragged = true;
+                instance.isBeingDragged = true;
 
-                let shiftX = e.clientX - element.getBoundingClientRect().left;
-                let shiftY = e.clientY - element.getBoundingClientRect().top;
+                let shiftX = e.clientX - element.getBoundingClientRect().left;
+                let shiftY = e.clientY - element.getBoundingClientRect().top;
 
-                // ✨ --- 修正開始 --- ✨
-                // 1. 找到內容的 div
                 const contentDiv = element.querySelector('.gemini-result-content');
-                // 2. 在移動 DOM 前，記住當前的滾動位置
                 const currentScrollTop = contentDiv.scrollTop;
                 const currentScrollLeft = contentDiv.scrollLeft;
-                // ✨ --- 修正結束 --- ✨
-
-                document.body.append(element);
-                element.style.position = 'absolute';
                 
-                // ✨ --- 修正開始 --- ✨
-                // 3. 移動 DOM 後，立刻還原滾動位置
+                document.body.append(element);
+                element.style.position = 'absolute';
+                
                 contentDiv.scrollTop = currentScrollTop;
                 contentDiv.scrollLeft = currentScrollLeft;
-                // ✨ --- 修正結束 --- ✨
-                
-                function moveAt(pageX, pageY) {
-                    element.style.left = `${pageX - shiftX}px`;
-                    element.style.top = `${pageY - shiftY}px`;
-                }
+                
+                function moveAt(pageX, pageY) {
+                    element.style.left = `${pageX - shiftX}px`;
+                    element.style.top = `${pageY - shiftY}px`;
+                }
                 moveAt(e.pageX, e.pageY);
 
                 function onMouseMove(event) {
@@ -842,20 +960,15 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             anchor.dataset.instanceId = instanceId;
             endRange.insertNode(anchor);
             
-            // ✨ 新增：創建一個容器來放置兩個按鈕
             const triggerContainer = document.createElement('div');
             triggerContainer.className = 'gemini-selection-trigger-container gemini-ui-element';
             triggerContainer.dataset.instanceId = instanceId;
             triggerContainer.style.position = 'absolute';
-            triggerContainer.style.display = 'flex'; // 讓按鈕並排
-            triggerContainer.style.gap = '5px'; // 按鈕間距
 
-            // 創建翻譯按鈕
             const translateButton = document.createElement('div');
             translateButton.className = 'gemini-selection-trigger';
             translateButton.innerText = '翻譯';
 
-            // 創建解釋按鈕
             const explainButton = document.createElement('div');
             explainButton.className = 'gemini-selection-trigger';
             explainButton.innerText = '解釋';
@@ -868,11 +981,10 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                 id: instanceId,
                 type: 'trigger',
                 anchor: anchor,
-                trigger: triggerContainer, // ✨ 修改：現在 trigger 是指按鈕容器
+                trigger: triggerContainer,
                 text: textToTranslate
             };
             
-            // ✨ 修改：為兩個按鈕分別添加事件監聽
             translateButton.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -931,94 +1043,69 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             isUpdateLoopRunning = false;
         }
         
-        function main() {
-            initializeTranslatorFeatures();
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', main);
-        } else {
-            main();
-        }
-
-chrome.runtime.onMessage.addListener((request, sender) => {
-    if ((request.action === 'translationResult' || request.action === 'explanationResult') && request.instanceId) {
-        const instance = activeInstances[request.instanceId];
-        if (instance && instance.type === 'box' && instance.box) {
-            if (instance.translationTimeout) {
-                clearTimeout(instance.translationTimeout);
+        // ✨ MODIFIED: onMessage listener 現在要處理更多種回覆
+        chrome.runtime.onMessage.addListener((request, sender) => {
+            if ((request.action === 'translationResult' || request.action === 'explanationResult') && request.instanceId) {
+                const instance = activeInstances[request.instanceId];
+                if (instance && instance.type === 'box' && instance.box) {
+                    if (instance.translationTimeout) clearTimeout(instance.translationTimeout);
+                    const contentDiv = instance.box.querySelector('.gemini-result-content');
+                    if (request.isError) {
+                        contentDiv.innerHTML = `<span style="color: red;">${request.text}</span>`;
+                        return;
+                    }
+                    renderMarkdownAndMath(contentDiv, request.text);
+                }
+                return;
             }
+            if (request.action === 'chatResult') {
+                removeChatLoading();
+                if (request.isError) {
+                    addMessageToChat('system', request.text);
+                } else {
+                    addMessageToChat('model', request.text);
+                }
+                return;
+            }
+            if (request.action === 'historyCleared') {
+                const messagesDiv = document.getElementById('gemini-chat-messages');
+                if(messagesDiv) messagesDiv.innerHTML = '';
+                addMessageToChat('system', request.text);
+                return;
+            }
+        });
 
-            const contentDiv = instance.box.querySelector('.gemini-result-content');
-
-            // ✨ --- 解決 Markdown 與 LaTeX 語法衝突的核心修改 --- ✨
-
-            /**
-             * 保護數學公式，防止被 marked.js 誤解析。
-             * @param {string} text - 從 Gemini 收到的原始文字
-             * @returns {string} - 保護好數學公式後的文字
-             */
+        // ✨ NEW: 渲染 Markdown 和數學公式的通用函式
+        function renderMarkdownAndMath(element, text) {
             function protectMath(text) {
                 return text.replace(/\$\$([\s\S]*?)\$\$|\$([^\$\n]+?)\$/g, (match, blockContent, inlineContent) => {
                     const content = blockContent || inlineContent;
-                    
-                    // ✨ --- 這是唯一的修改處 --- ✨
-                    // 在鏈式呼叫中，新增 .replace(/\*/g, '\\*') 來保護星號
-                    const escapedContent = content.replace(/_/g, '\\_')
-                                                  .replace(/\^/g, '\\^')
-                                                  .replace(/\*/g, '\\*');
-                    
-                    if (blockContent) {
-                        return `$$${escapedContent}$$`;
-                    } else {
-                        return `$${escapedContent}$`;
-                    }
+                    const escapedContent = content.replace(/_/g, '\\_').replace(/\^/g, '\\^').replace(/\*/g, '\\*');
+                    return blockContent ? `$$${escapedContent}$$` : `$${escapedContent}$`;
                 });
             }
-            // 步驟 1: 先用我們的保護函式處理原始文字
-            const protectedText = protectMath(request.text);
-            
-            // 步驟 2: 再將保護後的文字交給 marked.js 解析
+            const protectedText = protectMath(text);
             let htmlContent;
             if (window.marked) {
-                try {
-                    htmlContent = window.marked.parse(protectedText);
-                } catch (e) {
+                try { htmlContent = window.marked.parse(protectedText); } catch (e) {
                     console.error('[Gemini] marked.js 解析時發生錯誤:', e);
-                    htmlContent = protectedText;
+                    htmlContent = protectedText.replace(/\n/g, '<br>');
                 }
             } else {
                 console.error('[Gemini] marked.js 函式庫未載入！');
                 htmlContent = protectedText.replace(/\n/g, '<br>');
             }
-            
-            // 步驟 3: 將 HTML 內容寫入結果框
-            contentDiv.innerHTML = htmlContent;
-
-            // 步驟 4: 最後，呼叫 KaTeX 渲染所有數學公式 (它能正確處理我們之前加入的轉義字元)
+            element.innerHTML = htmlContent;
             if (window.renderMathInElement) {
                 try {
-                    renderMathInElement(contentDiv, {
-                        delimiters: [
-                            {left: "$$", right: "$$", display: true},
-                            {left: "$", right: "$", display: false}
-                        ],
+                    renderMathInElement(element, {
+                        delimiters: [{left: "$$", right: "$$", display: true}, {left: "$", right: "$", display: false}],
                         throwOnError: false
                     });
-                    console.log('[Gemini] KaTeX 渲染完成。');
-                } catch (e) {
-                    console.error('[Gemini] KaTeX 渲染時發生錯誤:', e);
-                }
-            } else {
-                console.error('[Gemini] KaTeX 的 renderMathInElement 函式未找到！');
-            }
-
-            // ✨ --- 修改結束 --- ✨
-
-            contentDiv.style.color = '';
+                } catch (e) { console.error('[Gemini] KaTeX 渲染時發生錯誤:', e); }
+            } else { console.error('[Gemini] KaTeX 的 renderMathInElement 函式未找到！'); }
         }
-    }
-});
+
         function updateFabState() {
             const fab = document.getElementById('gemini-fab');
             if (fab) {
@@ -1038,6 +1125,8 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                  if (!isTranslatorEnabled) {
                     cleanupAllTriggers();
                     Object.keys(activeInstances).forEach(cleanupInstance);
+                    const fabMenu = document.getElementById('gemini-fab-menu');
+                    if(fabMenu) fabMenu.classList.remove('visible');
                 }
             }
         });
@@ -1049,42 +1138,238 @@ chrome.runtime.onMessage.addListener((request, sender) => {
             updateFabState();
         }
 
+        // ✨ MODIFIED: 大幅修改，建立主選單和聊天介面
         function createFabAndMenu() {
             const fab = document.createElement('div');
             fab.id = 'gemini-fab';
             fab.innerText = 'G';
             document.body.appendChild(fab);
+
             const fabMenu = document.createElement('div');
             fabMenu.id = 'gemini-fab-menu';
+            fabMenu.classList.add('gemini-ui-element');
 
-            // ✨ 修改：更新選單文字，使其更通用
             const isEnabled = isTranslatorEnabled ? 'checked' : '';
-            fabMenu.innerHTML = `
-                <div class="gemini-menu-item gemini-pdf-link-item">
-                    <a href="https://jason168861.github.io/my-pdf-viewer/" target="_blank" rel="noopener noreferrer">
-                        翻譯 PDF 文件
-                    </a>
-                    <small>瀏覽器預設的 PDF 檢視器不支援，請由此上傳檔案操作。</small>
-                </div>
-                <div class="gemini-menu-separator"></div>
-                <div class="gemini-menu-item">
-                    <span>啟用 Gemini 功能</span>
-                    <label class="gemini-switch">
-                        <input type="checkbox" id="gemini-enable-switch" ${isEnabled}>
-                        <span class="gemini-slider"></span>
-                    </label>
+
+            const mainMenuHTML = `
+                <div id="gemini-menu-main" style="width: 100%;">
+                    <div class="gemini-menu-item gemini-pdf-link-item">
+                        <a href="https://jason168861.github.io/my-pdf-viewer/" target="_blank" rel="noopener noreferrer">翻譯 PDF 文件</a>
+                        <small>瀏覽器預設的 PDF 檢視器不支援，請由此上傳檔案操作。</small>
+                    </div>
+                    <div class="gemini-menu-separator"></div>
+                    <div class="gemini-menu-item" id="gemini-open-chat-btn">
+                        <span>💬 開啟 Gemini 聊天室</span>
+                    </div>
+                    <div class="gemini-menu-separator"></div>
+                    <div class="gemini-menu-item">
+                        <span>啟用 Gemini 功能</span>
+                        <label class="gemini-switch">
+                            <input type="checkbox" id="gemini-enable-switch" ${isEnabled}>
+                            <span class="gemini-slider"></span>
+                        </label>
+                    </div>
                 </div>
             `;
+
+            const chatViewHTML = `
+                <div id="gemini-chat-view" style="display: none;">
+                    <div id="gemini-chat-header">
+                        <button id="gemini-chat-back-btn" title="返回主選單">‹</button>
+                        <span id="gemini-chat-title">Gemini 聊天室</span>
+                        <button id="gemini-chat-clear-btn" title="清除聊天記錄">🗑️</button>
+                    </div>
+                    <div id="gemini-chat-messages"></div>
+                    <div id="gemini-chat-input-container">
+                         <div id="gemini-chat-file-preview" style="display: none;"></div>
+                         <form id="gemini-chat-input-form">
+                             <label for="gemini-chat-file-input" id="gemini-chat-file-label" title="上傳圖片/檔案">
+                                 <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"></path></svg>
+                             </label>
+                             <input type="file" id="gemini-chat-file-input" accept="image/jpeg,image/png,image/webp,image/heic">
+                             <textarea id="gemini-chat-textarea" rows="1" placeholder="輸入訊息..."></textarea>
+                             <button type="submit" id="gemini-chat-send-btn" title="傳送">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                             </button>
+                         </form>
+                    </div>
+                </div>
+            `;
+
+            fabMenu.innerHTML = mainMenuHTML + chatViewHTML;
             document.body.appendChild(fabMenu);
+            setupChatListeners();
+        }
+            // ✨ NEW: 處理圖片檔案的邏輯被抽成一個可重複使用的函式
+        function handleImageFile(file) {
+            // 確保傳入的是一個圖片檔案
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                chatImageCache = event.target.result;
+                const filePreview = document.getElementById('gemini-chat-file-preview');
+                
+                // 建立預覽畫面和移除按鈕
+                filePreview.innerHTML = `<img src="${chatImageCache}" alt="Preview"><button id="gemini-chat-remove-file">&times;</button>`;
+                filePreview.style.display = 'block';
+
+                // 為移除按鈕加上事件監聽
+                document.getElementById('gemini-chat-remove-file').addEventListener('click', () => {
+                    filePreview.style.display = 'none';
+                    filePreview.innerHTML = '';
+                    chatImageCache = null;
+                    // 重設 input 的值，這樣才能再次選擇同一個檔案
+                    document.getElementById('gemini-chat-file-input').value = ''; 
+                });
+            };
+            // 讀取檔案並轉為 Base64
+            reader.readAsDataURL(file);
+        }
+// ✨ MODIFIED: 此函式已更新，以整合貼上圖片功能
+function setupChatListeners() {
+    const mainMenu = document.getElementById('gemini-menu-main');
+    const chatView = document.getElementById('gemini-chat-view');
+    const fileInput = document.getElementById('gemini-chat-file-input');
+    const textarea = document.getElementById('gemini-chat-textarea');
+    const form = document.getElementById('gemini-chat-input-form');
+
+    // --- 按鈕切換邏輯 (維持不變) ---
+    document.getElementById('gemini-open-chat-btn').addEventListener('click', () => {
+        mainMenu.style.display = 'none';
+        chatView.style.display = 'flex';
+        if (document.getElementById('gemini-chat-messages').childElementCount === 0) {
+            addMessageToChat('system', '你好！我可以為你做什麼？');
+        }
+    });
+    document.getElementById('gemini-chat-back-btn').addEventListener('click', () => {
+        chatView.style.display = 'none';
+        mainMenu.style.display = 'block';
+    });
+    document.getElementById('gemini-chat-clear-btn').addEventListener('click', () => {
+        if(confirm('確定要清除本次的所有聊天記錄嗎？')) {
+            chrome.runtime.sendMessage({ action: 'clearChatHistory' });
+        }
+    });
+
+    // ✨ MODIFIED: 檔案上傳監聽器現在呼叫新的輔助函式，程式碼更簡潔
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            handleImageFile(file);
+        }
+    });
+
+    // ✨ NEW: 為輸入框新增貼上事件的監聽器
+    textarea.addEventListener('paste', (e) => {
+        // 取得剪貼簿中的項目
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        let imageFound = false;
+        
+        for (const item of items) {
+            // 如果項目是檔案且類型為圖片
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const imageFile = item.getAsFile();
+                handleImageFile(imageFile); // 使用剛剛建立的輔助函式處理
+                imageFound = true;
+                break; // 只處理第一張圖片
+            }
+        }
+
+        // 如果貼上的是圖片，就阻止瀏覽器的預設貼上行為(例如貼上檔案路徑文字)
+        if (imageFound) {
+            e.preventDefault();
+        }
+    });
+
+
+    // --- 輸入與傳送邏輯 (維持不變) ---
+    textarea.addEventListener('input', () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const prompt = textarea.value.trim();
+        if (!prompt && !chatImageCache) return;
+
+        addMessageToChat('user', prompt, chatImageCache);
+        chrome.runtime.sendMessage({
+            action: 'chat',
+            prompt: prompt,
+            imageDataUrl: chatImageCache
+        });
+
+        // 重設輸入區
+        textarea.value = '';
+        textarea.style.height = 'auto';
+        chatImageCache = null;
+        const filePreview = document.getElementById('gemini-chat-file-preview');
+        filePreview.style.display = 'none';
+        filePreview.innerHTML = '';
+        fileInput.value = '';
+
+        addChatLoading();
+    });
+}
+
+        // ✨ NEW: 新增/移除聊天載入動畫的函式
+        function addChatLoading() {
+            const messagesDiv = document.getElementById('gemini-chat-messages');
+            if (document.getElementById('gemini-chat-loader-msg')) return;
+            const loaderMessage = document.createElement('div');
+            loaderMessage.id = 'gemini-chat-loader-msg';
+            loaderMessage.className = 'gemini-chat-message model';
+            loaderMessage.innerHTML = `<div class="gemini-chat-loader"><span></span><span></span><span></span></div>`;
+            messagesDiv.appendChild(loaderMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        function removeChatLoading() {
+            const loaderMessage = document.getElementById('gemini-chat-loader-msg');
+            if (loaderMessage) loaderMessage.remove();
+        }
+
+        // ✨ NEW: 將訊息加入聊天畫面的函式
+        function addMessageToChat(role, text, imageUrl = null) {
+            const messagesDiv = document.getElementById('gemini-chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `gemini-chat-message ${role}`;
+
+            if (role === 'model') {
+                 renderMarkdownAndMath(messageDiv, text);
+            } else {
+                 const textNode = document.createElement('div');
+                 textNode.textContent = text;
+                 messageDiv.appendChild(textNode);
+            }
+
+            if (imageUrl) {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.className = 'gemini-chat-image-preview';
+                messageDiv.appendChild(img);
+            }
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
         function setupGlobalListeners() {
             document.addEventListener('mouseup', (e) => {
                 if (!isTranslatorEnabled) return;
-                const clickedOnOurUI = e.target.closest('.gemini-ui-element, #gemini-fab, #gemini-fab-menu');
-                if (!clickedOnOurUI) {
-                    cleanupAllTriggers();
+                const clickedOnOurUI = e.target.closest('.gemini-ui-element, #gemini-fab');
+                if (clickedOnOurUI) {
+                    return;
                 }
+                cleanupAllTriggers();
                 setTimeout(() => {
                     if (isProcessingUITranslation) {
                         isProcessingUITranslation = false;
@@ -1098,7 +1383,6 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                     }
                     const selectedText = selection.toString().trim();
                     if (selectedText.length > 0) {
-                        if(!clickedOnOurUI) cleanupAllTriggers();
                         createTriggerInstance(selection);
                     }
                 }, 50);
@@ -1114,10 +1398,24 @@ chrome.runtime.onMessage.addListener((request, sender) => {
                     fabMenu.classList.remove('visible');
                 }
                 const enableSwitch = document.getElementById('gemini-enable-switch');
-                if (enableSwitch && e.target === enableSwitch) {
-                    chrome.storage.sync.set({ isTranslatorEnabled: e.target.checked });
+                if (enableSwitch && e.target.closest('.gemini-switch')) {
+                     const checkbox = e.target.closest('.gemini-switch').querySelector('input');
+                     if(checkbox) {
+                        const isChecked = e.target === checkbox ? checkbox.checked : !checkbox.checked;
+                        chrome.storage.sync.set({ isTranslatorEnabled: isChecked });
+                     }
                 }
             });
+        }
+        
+        function main() {
+            initializeTranslatorFeatures();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
         }
     }
 

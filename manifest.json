@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Gemini 即時翻譯+解釋 (含 KaTeX)",
-  "version": "2.0.0",
+  "name": "Gemini 即時翻譯+解釋+聊天機器",
+  "version": "3.0.0",
   "description": "框選文字即可使用 Gemini API 進行翻譯與數學解釋。請在選項頁面設定您自己的 API 金鑰。",
   "permissions": [
     "storage"
